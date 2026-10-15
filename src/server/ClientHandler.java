@@ -1,9 +1,11 @@
 package server;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.Socket;
@@ -39,7 +41,7 @@ public class ClientHandler implements Runnable {
                 }
 
                 File destinationFile = new File(dir, fileName);
-                System.out.println("[SERVER] Menerima berkas: " + fileName + " (" + fileSize + " bytes)");
+                System.out.println("[SERVER] Menerima unggahan: " + fileName + " (" + fileSize + " bytes)");
 
                 // 2. Baca Stream Biner Berkas dengan Buffered Stream
                 try (FileOutputStream fos = new FileOutputStream(destinationFile);
@@ -66,6 +68,52 @@ public class ClientHandler implements Runnable {
                 dos.writeUTF("SUCCESS: Berkas berhasil diunggah pada " + timestamp);
                 dos.flush();
                 System.out.println("[SERVER] " + logEntry);
+
+            } else if ("DOWNLOAD".equalsIgnoreCase(command)) {
+                // Protokol DOWNLOAD: Baca nama berkas yang diminta
+                String fileName = dis.readUTF();
+                File targetFile = new File(STORAGE_DIR, fileName);
+
+                if (!targetFile.exists() || !targetFile.isFile()) {
+                    // Kirim sinyal bahwa berkas TIDAK ADA
+                    dos.writeBoolean(false);
+                    dos.writeUTF("ERROR: Berkas '" + fileName + "' tidak ditemukan di server.");
+                    dos.flush();
+
+                    String timestamp = WorldTimeService.getOfficialTimestamp();
+                    String logEntry = String.format("[%s] DOWNLOAD GAGAL: Berkas '%s' tidak ditemukan (IP: %s)",
+                            timestamp, fileName, clientIp);
+                    FileLogger.logTransaction(logEntry);
+                    System.out.println("[SERVER] " + logEntry);
+                } else {
+                    // Berkas ADA: Kirim sinyal true dan ukuran berkas
+                    dos.writeBoolean(true);
+                    long fileSize = targetFile.length();
+                    dos.writeLong(fileSize);
+                    dos.flush();
+
+                    System.out.println("[SERVER] Mengirimkan berkas: " + fileName + " (" + fileSize + " bytes) ke IP: " + clientIp);
+
+                    // Alirkan isi biner berkas ke klien
+                    try (FileInputStream fis = new FileInputStream(targetFile);
+                         BufferedInputStream bis = new BufferedInputStream(fis)) {
+
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = bis.read(buffer)) != -1) {
+                            dos.write(buffer, 0, bytesRead);
+                        }
+                        dos.flush();
+                    }
+
+                    // Ambil Timestamp Resmi dan Catat ke Audit Log
+                    String timestamp = WorldTimeService.getOfficialTimestamp();
+                    String logEntry = String.format("[%s] DOWNLOAD SUKSES: Berkas '%s' (%d bytes) diambil oleh IP %s",
+                            timestamp, fileName, fileSize, clientIp);
+                    FileLogger.logTransaction(logEntry);
+                    System.out.println("[SERVER] " + logEntry);
+                }
+
             } else {
                 dos.writeUTF("ERROR: Perintah tidak dikenali.");
                 dos.flush();
