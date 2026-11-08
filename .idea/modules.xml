@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/NetDrive.iml" filepath="$PROJECT_DIR$/NetDrive.iml" />
+      <module fileurl="file://$PROJECT_DIR$/netdrive.iml" filepath="$PROJECT_DIR$/netdrive.iml" />
     </modules>
   </component>
 </project>
