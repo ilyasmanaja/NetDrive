@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetDrive Cloud — Kelompok 4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+<!-- Toast Notifikasi Sinkronisasi UDP Real-Time -->
+<div id="udpToastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+<!-- Header & Connection Bar -->
+<header class="bg-slate-900 border-b border-slate-800 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-lg">N</div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight">NetDrive Cloud <span class="text-xs font-normal text-indigo-400 ml-1">Kelompok 4</span></h1>
+                <p class="text-xs text-slate-400">Secure Multi-Client Storage, Chat & UDP Sync</p>
+            </div>
+        </div>
+
+        <!-- Form Login / Status Koneksi -->
+        <div id="loginForm" class="flex flex-wrap items-center gap-2">
+            <input id="hostInput" type="text" value="127.0.0.1" placeholder="IP Server"
+                   class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:border-indigo-500">
+            <input id="userInput" type="text" placeholder="Username (misal: Han)"
+                   class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:border-indigo-500">
+            <button onclick="connectServer()"
+                    class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-1.5 rounded-lg transition">
+                Connect & Login
+            </button>
+        </div>
+
+        <div id="connectedBar" class="hidden flex items-center gap-3">
+                <span class="inline-flex items-center gap-2 bg-emerald-950/70 border border-emerald-700/50 text-emerald-300 text-xs px-3 py-1.5 rounded-full">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Online: <strong id="activeUserLabel">-</strong> (<span id="activeHostLabel">-</span>)
+                </span>
+            <button onclick="disconnectServer()"
+                    class="bg-rose-600/90 hover:bg-rose-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition">
+                Exit
+            </button>
+        </div>
+    </div>
+</header>
+
+<!-- Main Content Grid -->
+<main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+    <!-- Kolom Kiri (7 Kolom): Cloud Storage & Upload/Download -->
+    <section class="lg:col-span-7 flex flex-col gap-6">
+        <!-- Upload Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">Upload Berkas Biner (Chunking 8KB + Verifikasi)</h2>
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <input id="fileInput" type="file"
+                       class="block w-full text-sm text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-800 file:text-indigo-400 hover:file:bg-slate-700 cursor-pointer border border-slate-800 rounded-lg p-1">
+                <button id="uploadBtn" onclick="uploadFile()"
+                        class="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 rounded-lg whitespace-nowrap transition">
+                    Upload ke Cloud
+                </button>
+            </div>
+            <p id="uploadStatus" class="text-xs text-slate-400 mt-2"></p>
+        </div>
+
+        <!-- Tabel Daftar Berkas Terpusat -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 flex-1">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Penyimpanan Terpusat NetDrive</h2>
+                <span id="fileCountBadge" class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md">0 berkas</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                    <tr class="border-b border-slate-800 text-xs text-slate-400 uppercase">
+                        <th class="py-2.5 px-3">Nama Berkas</th>
+                        <th class="py-2.5 px-3">Ukuran</th>
+                        <th class="py-2.5 px-3">Pengunggah</th>
+                        <th class="py-2.5 px-3">Timestamp (WorldTimeAPI)</th>
+                        <th class="py-2.5 px-3 text-right">Aksi</th>
+                    </tr>
+                    </thead>
+                    <tbody id="fileTableBody" class="divide-y divide-slate-800/70 text-sm">
+                    <tr>
+                        <td colspan="5" class="py-8 text-center text-slate-500 text-xs">Belum ada berkas atau belum terhubung ke server.</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Kolom Kanan (5 Kolom): Pengguna Aktif, Log UDP Sync & Team Chat -->
+    <section class="lg:col-span-5 flex flex-col gap-6">
+
+        <!-- Pengguna Aktif -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Klien Aktif (LIST)</h2>
+            <div id="activeUsersList" class="flex flex-wrap gap-2">
+                <span class="text-xs text-slate-500">Tidak ada pengguna aktif</span>
+            </div>
+        </div>
+
+        <!-- Live Chat (Broadcast & Private Msg) -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col h-[420px]">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400">Live Team Chat & UDP Sync Log</h2>
+                <span class="text-[11px] text-slate-500">TCP Control + UDP 9876</span>
+            </div>
+
+            <div id="chatBox" class="flex-1 overflow-y-auto py-3 space-y-2.5 text-sm pr-1">
+                <div class="text-xs text-slate-500 text-center py-4">Silakan login untuk memulai chat dan sinkronisasi.</div>
+            </div>
+
+            <!-- Input Chat -->
+            <div class="pt-3 border-t border-slate-800 flex flex-col gap-2">
+                <div class="flex gap-2">
+                    <select id="chatTargetSelect" class="bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none">
+                        <option value="ALL">📢 Broadcast (Semua)</option>
+                    </select>
+                    <input id="chatInput" type="text" placeholder="Ketik pesan..." onkeydown="if(event.key==='Enter') sendChat()"
+                           class="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-indigo-500">
+                    <button onclick="sendChat()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-4 py-1.5 rounded-lg">
+                        Kirim
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </section>
+</main>
+
+<script>
+    let currentUser = "";
+    let ws;
+
+    function initWebSocket() {
+        const proto = location.protocol === "https:" ? "wss://" : "ws://";
+        ws = new WebSocket(proto + location.host + "/ws");
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            handleServerEvent(data);
+        };
+
+        ws.onclose = () => {
+            setTimeout(initWebSocket, 2000);
+        };
+    }
+
+    function handleServerEvent(data) {
+        if (data.type === "STATE" || data.type === "STATUS") {
+            updateConnectionUI(data.connected, data.username, data.serverHost);
+            if (data.users !== undefined) renderUsers(data.users);
+            if (data.filesJson !== undefined) renderFiles(JSON.parse(data.filesJson || "[]"));
+        } else if (data.type === "USER_LIST") {
+            renderUsers(data.users);
+        } else if (data.type === "FILE_LIST") {
+            renderFiles(JSON.parse(data.filesJson || "[]"));
+        } else if (data.type === "CHAT_ALL") {
+            appendChatMessage(`[${data.time}] <strong>${escapeHtml(data.sender)}</strong>: ${escapeHtml(data.message)}`, "bg-slate-800/80");
+        } else if (data.type === "CHAT_PM") {
+            appendChatMessage(`[${data.time}] <span class="text-amber-400 font-semibold">[PM ${escapeHtml(data.sender)} → ${escapeHtml(data.target)}]</span>: ${escapeHtml(data.message)}`, "bg-amber-950/40 border border-amber-700/40");
+        } else if (data.type === "UDP_SYNC") {
+            const sizeKb = (data.fileSize / 1024).toFixed(1);
+            const msg = `📡 <strong>[UDP SYNC ACK]</strong> Berkas baru <u>${escapeHtml(data.fileName)}</u> (${sizeKb} KB) oleh <strong>${escapeHtml(data.uploader)}</strong> pada ${data.timestamp}`;
+            appendChatMessage(msg, "bg-indigo-950/60 border border-indigo-700/50 text-indigo-200");
+            showUdpToast(data.fileName, data.uploader, sizeKb);
+        } else if (data.type === "SYS_ERR") {
+            appendChatMessage(`⚠️ <span class="text-rose-400">${escapeHtml(data.message)}</span>`, "bg-rose-950/40 border border-rose-800/50");
+        }
+    }
+
+    function updateConnectionUI(isConnected, user, host) {
+        currentUser = user || "";
+        document.getElementById("loginForm").classList.toggle("hidden", isConnected);
+        document.getElementById("connectedBar").classList.toggle("hidden", !isConnected);
+        if (isConnected) {
+            document.getElementById("activeUserLabel").textContent = user;
+            document.getElementById("activeHostLabel").textContent = host || document.getElementById("hostInput").value;
+        }
+    }
+
+    async function connectServer() {
+        const host = document.getElementById("hostInput").value.trim();
+        const username = document.getElementById("userInput").value.trim();
+        if (!username) return alert("Masukkan username terlebih dahulu!");
+
+        const res = await fetch("/api/connect", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ host, username })
+        });
+        const json = await res.json();
+        if (!json.ok) {
+            alert("Gagal login: " + json.message);
+        } else {
+            document.getElementById("chatBox").innerHTML = "";
+            appendChatMessage(`✅ Terhubung sebagai <strong>${escapeHtml(username)}</strong>.`, "bg-emerald-950/40 text-emerald-300");
+        }
+    }
+
+    async function disconnectServer() {
+        await fetch("/api/disconnect", { method: "POST" });
+    }
+
+    async function sendChat() {
+        const input = document.getElementById("chatInput");
+        const target = document.getElementById("chatTargetSelect").value;
+        const message = input.value.trim();
+        if (!message) return;
+
+        input.value = "";
+        await fetch("/api/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                mode: target === "ALL" ? "BROADCAST" : "PRIVATE",
+                target: target,
+                message: message
+            })
+        });
+    }
+
+    async function uploadFile() {
+        const fileInput = document.getElementById("fileInput");
+        const statusEl = document.getElementById("uploadStatus");
+        const btn = document.getElementById("uploadBtn");
+
+        if (!fileInput.files.length) return alert("Pilih berkas terlebih dahulu!");
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        btn.disabled = true;
+        statusEl.textContent = "⏳ Mengunggah berkas (chunking 8KB) & memverifikasi ukuran...";
+        statusEl.className = "text-xs text-indigo-400 mt-2";
+
+        try {
+            const res = await fetch("/api/upload", { method: "POST", body: formData });
+            const json = await res.json();
+            if (json.ok) {
+                statusEl.textContent = "✅ Upload & verifikasi ukuran sukses! Notifikasi UDP disiarkan.";
+                statusEl.className = "text-xs text-emerald-400 mt-2";
+                fileInput.value = "";
+            } else {
+                statusEl.textContent = "❌ Gagal: " + json.message;
+                statusEl.className = "text-xs text-rose-400 mt-2";
+            }
+        } catch (e) {
+            statusEl.textContent = "❌ Error jaringan: " + e.message;
+            statusEl.className = "text-xs text-rose-400 mt-2";
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function renderUsers(usersCsv) {
+        const listEl = document.getElementById("activeUsersList");
+        const selectEl = document.getElementById("chatTargetSelect");
+        const prevTarget = selectEl.value;
+
+        const users = usersCsv ? usersCsv.split(",").filter(u => u.trim() !== "") : [];
+        if (!users.length) {
+            listEl.innerHTML = `<span class="text-xs text-slate-500">Tidak ada pengguna aktif</span>`;
+            return;
+        }
+
+        listEl.innerHTML = users.map(u => `
+                <span class="inline-flex items-center gap-1.5 bg-slate-800 border border-slate-700 text-xs px-2.5 py-1 rounded-full">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    ${escapeHtml(u)} ${u === currentUser ? "(Anda)" : ""}
+                </span>
+            `).join("");
+
+        selectEl.innerHTML = `<option value="ALL">📢 Broadcast (Semua)</option>` +
+            users.filter(u => u !== currentUser).map(u => `<option value="${escapeHtml(u)}">🔒 PM ke ${escapeHtml(u)}</option>`).join("");
+        if ([...selectEl.options].some(o => o.value === prevTarget)) {
+            selectEl.value = prevTarget;
+        }
+    }
+
+    function renderFiles(files) {
+        const tbody = document.getElementById("fileTableBody");
+        document.getElementById("fileCountBadge").textContent = `${files.length} berkas`;
+
+        if (!files.length) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-slate-500 text-xs">Belum ada berkas tersimpan di server.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = files.map(f => {
+            const sizeText = f.fileSize < 1024 ? `${f.fileSize} B` : `${(f.fileSize / 1024).toFixed(1)} KB`;
+            return `
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="py-2.5 px-3 font-medium text-slate-200">${escapeHtml(f.fileName)}</td>
+                        <td class="py-2.5 px-3 text-xs text-slate-400">${sizeText}</td>
+                        <td class="py-2.5 px-3 text-xs text-indigo-300">${escapeHtml(f.uploadedBy)}</td>
+                        <td class="py-2.5 px-3 text-xs text-slate-400">${escapeHtml(f.uploadedAt)}</td>
+                        <td class="py-2.5 px-3 text-right">
+                            <a href="/api/download/${encodeURIComponent(f.fileName)}"
+                               class="inline-block bg-slate-800 hover:bg-indigo-600 text-xs text-slate-200 hover:text-white px-3 py-1 rounded-md transition">
+                                Download
+                            </a>
+                        </td>
+                    </tr>
+                `;
+        }).join("");
+    }
+
+    function appendChatMessage(html, extraClass) {
+        const box = document.getElementById("chatBox");
+        const div = document.createElement("div");
+        div.className = `px-3 py-2 rounded-lg text-xs leading-relaxed ${extraClass}`;
+        div.innerHTML = html;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+
+    function showUdpToast(fileName, uploader, sizeKb) {
+        const container = document.getElementById("udpToastContainer");
+        const toast = document.createElement("div");
+        toast.className = "bg-indigo-900/95 border border-indigo-500 text-white px-4 py-3 rounded-xl shadow-xl text-xs";
+        toast.innerHTML = `
+                <div class="font-bold text-indigo-200 mb-0.5">📡 Sinkronisasi UDP Diterima!</div>
+                <div><strong>${escapeHtml(uploader)}</strong> mengunggah <strong>${escapeHtml(fileName)}</strong> (${sizeKb} KB).</div>
+            `;
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    initWebSocket();
+</script>
+</body>
+</html>

@@ -7,3 +7,15 @@
 [2026-10-15T11:50:17.0836888] INIT: Test system logging berhasil.
 [2026-10-15T11:51:22.6659638] DOWNLOAD GAGAL: Berkas 'test.txt' tidak ditemukan (IP: 127.0.0.1)
 [2026-10-15T11:51:50.3296077] DOWNLOAD SUKSES: Berkas 'tes.txt' (19 bytes) diambil oleh IP 127.0.0.1
+[2026-11-15 00:11:17] LOGIN: Raihan (127.0.0.1)
+[2026-11-15 00:11:32] LOGIN: Ilyasman (127.0.0.1)
+[2026-11-15 00:13:28] LOGOUT: Raihan
+[2026-11-15 00:13:34] LOGOUT: Ilyasman
+[2026-11-15 00:13:50] LOGIN: raihan (127.0.0.1)
+[2026-11-15 00:14:00] LOGIN: arip (127.0.0.1)
+[2026-11-15 00:15:54] UPLOAD VERIFIED: 'panduan-spesifikasi-final-project.pdf' (254027 bytes) oleh 'raihan' (127.0.0.1)
+[2026-11-15 00:16:20] DOWNLOAD: 'panduan-spesifikasi-final-project.pdf' (254027 bytes) diunduh oleh 'arip' (127.0.0.1)
+[2026-11-15 00:17:02] LOGOUT: arip
+[2026-11-15 00:17:25] LOGIN: arip (127.0.0.1)
+[2026-11-15 00:17:37] LOGOUT: arip
+[2026-11-15 00:18:07] LOGIN: arip (127.0.0.1)
